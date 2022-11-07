@@ -126,7 +126,7 @@ public class Scheduler {
             this.ejecutando = this.listos.get();
             this.ejecutando.ToEjecutando();
         }else if(this.contadorCompletados<this.num_procesos){
-            System.out.println("Esperando por proceso\n");
+            //System.out.println("Esperando por proceso\n");
             while (this.listos.size()==0 && this.contadorCompletados<this.num_procesos && this.ejecutando == null){
                 if(this.ejecutando==null){
                     this.esperarSegundos(5);
