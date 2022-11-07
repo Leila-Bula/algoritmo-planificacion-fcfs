@@ -9,10 +9,10 @@ public class Proceso {
         super();
         this.estado = Estado.NUEVO;
         this.numRafES = n_res;
+        this.sumRafES = 0;
     }
 
     public Estado run() {
-        this.sumRafES = 0;
         int s = 0;
         while (this.sumRafES<this.numRafES){
             for(int i= 0; i<=((int) Math.round(Math.random()*10));i++){
@@ -24,6 +24,9 @@ public class Proceso {
             this.sumRafES++;
             this.block();
             return this.estado;
+        }
+        for(int i=0;i<5;i++){
+            s++;
         }
         this.terminate();
         return this.estado;

@@ -21,6 +21,9 @@ public class Scheduler {
 
     private HashMap<Long, Datos> datosRecolectados;
 
+    private boolean iniciado;
+    private boolean swiche;
+
     public Scheduler(int num_procesos, long lapso) {
         this.num_procesos = num_procesos;
         this.lapso = lapso;
@@ -32,6 +35,8 @@ public class Scheduler {
         this.datosRecolectados = new HashMap<>();
         this.contador = 0;
         this.contadorCompletados = 0;
+        this.iniciado = false;
+        this.swiche = false;
     }
 
     private void esperar(long milisegundos){
@@ -55,113 +60,160 @@ public class Scheduler {
     }
 
     private void addListos(BCP process){
-        listos.add(process);
+        this.listos.add(process);
     }
 
     private void addBloqueados(BCP process){
-        bloqueados.add(process);
+        this.bloqueados.add(process);
     }
 
     private void addTerminados(BCP process){
-        terminados.add(process);
+        this.terminados.add(process);
     }
 
     private void addNuevos(BCP process){
-        nuevos.add(process);
+        this.nuevos.add(process);
     }
 
     private void crearProceso(){
         BCP process = new BCP(this.contador+1);
         this.addNuevos(process);
-        System.out.println("Creando proceso " + process.getId()+"\n");
+        System.out.println("Creando proceso " + process.getId()+" con " + process.getRES() + " rafagas de E/S\n");
     }
 
     private void creadorProcesos(){
         this.crearProceso();
-        contador++;
-        while(contador<num_procesos){
+        CompletableFuture.runAsync(()->{
+            this.cargadorProcesos();
+        });
+        this.contador++;
+        while(this.contador<this.num_procesos){
             if(Math.round(Math.random()*10)>5){
-                esperar(lapso);
+                this.esperar(lapso);
             }
             this.crearProceso();
-            contador++;
+            CompletableFuture.runAsync(()->{
+                this.cargadorProcesos();
+            });
+            this.contador++;
         }
     }
 
     private void cargadorProcesos(){
-        while(contador<num_procesos) {
-            while (nuevos.size() > 0) {
-                BCP proceso = nuevos.get();
-                proceso.chargeProceso();
-                if(proceso.getEstado().equals(Estado.LISTO)){
-                    this.addListos(proceso);
-                    System.out.println("Cargando proceso " + proceso.getId()+"\n");
+        if (this.nuevos.size() > 0) {
+            BCP proceso = this.nuevos.get();
+            proceso.chargeProceso();
+            if(proceso.getEstado().equals(Estado.LISTO)){
+                this.addListos(proceso);
+                System.out.println("Cargando proceso " + proceso.getId()+"\n");
+                if(!this.swiche){
+                    this.swiche=true;
                 }
             }
         }
     }
 
     private void eliminadorProcesos(){
-        while (contadorCompletados<num_procesos){
-            while(terminados.size()>0){
-                BCP process = terminados.get();
-                datosRecolectados.put(process.getId(),process.getDatos());
-                System.out.println("Eliminando proceso " + process.getId()+"\n");
-                contadorCompletados++;
+        if(this.terminados.size()>0){
+            BCP process = this.terminados.get();
+            datosRecolectados.put(process.getId(),process.getDatos());
+            //System.out.println("Eliminando proceso " + process.getId()+"\n");
+        }
+    }
+
+    private void dispatcher(){
+        if (this.listos.size() > 0) {
+            this.ejecutando = this.listos.get();
+            this.ejecutando.ToEjecutando();
+        }else if(this.contadorCompletados<this.num_procesos){
+            System.out.println("Esperando por proceso\n");
+            while (this.listos.size()==0 && this.contadorCompletados<this.num_procesos && this.ejecutando == null){
+                if(this.ejecutando==null){
+                    this.esperarSegundos(5);
+                }else{
+                    break;
+                }
+            }
+            if(this.contadorCompletados==this.num_procesos) {
+                System.out.println("Ejecución terminada\n");
+            }else{
+                if (this.ejecutando==null){
+                    this.ejecutando = this.listos.get();
+                    this.ejecutando.ToEjecutando();
+                }
             }
         }
     }
 
-    private boolean dispatcher(){
-        if(ejecutando==null){
-            if(listos.size()>0){
-                ejecutando = listos.get();
-                ejecutando.ToEjecutando();
-                return true;
-            }
+    private void ejecutarES(){
+        BCP process = this.bloqueados.get();
+        this.esperarSegundos(10);
+        process.Deblock();
+        this.addListos(process);
+    }
+    private void ejecutar(){
+        if(!this.iniciado){
+            this.iniciado = true;
+            this.dispatcher();
+            CompletableFuture.supplyAsync(() -> {
+                //System.out.println("Proceso " + this.ejecutando.getId()+" a ejecucion\n");
+                return this.ejecutando.Run();
+            }).thenAcceptAsync((Estado estado) -> {
+                BCP process = this.ejecutando;
+                this.ejecutando = null;
+                CompletableFuture.runAsync(()->{this.ejecutar();});
+                if (estado.equals(Estado.TERMINADO)) {
+                    this.contadorCompletados++;
+                    //System.out.println("Proceso " + process.getId()+" terminado\n");
+                    this.addTerminados(process);
+                    CompletableFuture.runAsync(()->{
+                        this.eliminadorProcesos();
+                    });
+                } else {
+                    this.addBloqueados(process);
+                    CompletableFuture.runAsync(()->{this.ejecutarES();});
+                    //System.out.println("Proceso " + process.getId()+" bloqueado\n");
+                }
+            });
+        }else if(this.num_procesos>this.contadorCompletados){
+            this.dispatcher();
+            CompletableFuture.supplyAsync(() -> {
+                //System.out.println("Proceso " + this.ejecutando.getId()+" a ejecucion\n");
+                return this.ejecutando.Run();
+            }).thenAcceptAsync((Estado estado) -> {
+                BCP process = this.ejecutando;
+                this.ejecutando = null;
+                CompletableFuture.runAsync(()->{this.ejecutar();});
+                if (estado.equals(Estado.TERMINADO)) {
+                    this.contadorCompletados++;
+                    //System.out.println("Proceso " + process.getId()+" terminado\n");
+                    this.addTerminados(process);
+                    CompletableFuture.runAsync(()->{
+                        this.eliminadorProcesos();
+                    });
+                } else {
+                    this.addBloqueados(process);
+                    CompletableFuture.runAsync(()->{this.ejecutarES();});
+                    //System.out.println("Proceso " + process.getId()+" bloqueado\n");
+                }
+            });
+        }else if(this.num_procesos==this.contadorCompletados){
+            System.out.println("Ejecución terminada\n");
         }
-        return false;
     }
 
     public void start(){
         CompletableFuture creadorProcesosE = CompletableFuture.runAsync(()->{
             this.creadorProcesos();
         });
-        CompletableFuture cargadorProcesosE = CompletableFuture.runAsync(()->{
-            this.cargadorProcesos();
-        });
-        CompletableFuture eliminadorProcesosE = CompletableFuture.runAsync(()->{
-            this.eliminadorProcesos();
-        });
-        while (contadorCompletados<num_procesos) {
-            while ((contadorCompletados < num_procesos) && (ejecutando == null)) {
-                boolean swiche = this.dispatcher();
-                if (swiche) {
-                    CompletableFuture.supplyAsync(() -> {
-                        return this.ejecutando.Run();
-                    }).thenApplyAsync((Estado estado) -> {
-                        BCP process = ejecutando;
-                        ejecutando = null;
-                        if (estado.equals(Estado.TERMINADO)) {
-                            System.out.println("Proceso " + process.getId()+" terminado\n");
-                            this.addTerminados(process);
-                            return null;
-                        } else {
-                            this.addBloqueados(process);
-                            System.out.println("Proceso " + process.getId()+" bloqueado\n");
-                            return process;
-                        }
-                    }).thenAcceptAsync((BCP process) -> {
-                        if (process != null) {
-                            long segundos = Math.round(Math.random() * 10);
-                            this.esperarSegundos(segundos);
-                            process.Deblock();
-                            this.addListos(process);
-                            System.out.println("Pasando proceso " + process.getId()+"de bloqueado a listo\n");
-                            this.bloqueados.getOut(process);
-                        }
-                    });
-                }
+        while (!this.swiche){
+            esperar(1);
+        }
+        this.ejecutar();
+        while (this.num_procesos>this.contadorCompletados){
+            esperar(1);
+            if(this.num_procesos==this.contadorCompletados){
+                break;
             }
         }
     }

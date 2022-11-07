@@ -1,12 +1,16 @@
 package proceso;
 
+import java.util.Date;
+
 public class BCP {
     private long id;
     private Proceso proceso;
     private Datos datos;
 
+    private Date created_at;
     public BCP(long id) {
         this.proceso = new Proceso((int) Math.round(Math.random()*10));
+        this.created_at = new Date();
         this.id = id;
     }
 
@@ -20,7 +24,7 @@ public class BCP {
 
     public void chargeProceso(){
         this.proceso.toListo();
-        this.datos = new Datos(proceso.getNumRafES());
+        this.datos = new Datos(proceso.getNumRafES(),this.created_at);
         this.datos.add(TypeCambio.NUEVO_LISTO);
     }
 
@@ -29,7 +33,11 @@ public class BCP {
     }
 
     public Estado Run(){
-        return this.proceso.run();
+        Estado estado = this.proceso.run();
+        if(estado.equals(Estado.BLOQUEADO)){
+            this.datos.add(TypeCambio.EJECUTANDO_BLOQUEADO);
+        }
+        return estado;
     }
 
     public void Block(){
@@ -58,5 +66,9 @@ public class BCP {
     public void Stop(){
         this.proceso.stop();
         this.datos.add(TypeCambio.EJECUTANDO_LISTO);
+    }
+
+    public int getRES(){
+        return this.proceso.getNumRafES();
     }
 }
