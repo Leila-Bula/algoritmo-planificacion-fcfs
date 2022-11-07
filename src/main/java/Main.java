@@ -1,8 +1,9 @@
-import proceso.Dato;
-import proceso.Datos;
 import java.util.HashMap;
 import java.util.Scanner;
 import java.util.Set;
+
+import proceso.Dato;
+import proceso.Datos;
 
 class Main {
   public static void main(String[] args) {
@@ -37,7 +38,7 @@ class Main {
     System.out.println("\n\n\n\n");
     System.out.println("------MAS DETALLES------\n");
     for (Long process_id : keys) {
-      System.out.println("PROCESO" + process_id + "\n");
+      System.out.println("PROCESO " + process_id + "\n");
       for (Dato dato : map.get(process_id).getDatos()) {
         dato.imprimir("                 ");
       }
@@ -56,18 +57,18 @@ class Main {
     long n_REj = n_RES + 1;
     boolean swiche = true;
     for (Dato dato : process_datos.getDatos()) {
-      switch (dato.getTypeCambio()) {
-        case NUEVO_LISTO: {
+      switch (dato.getTypeCambio().toString()) {
+        case "NUEVO_LISTO": {
           ult_listo = dato.getTime().getTime();
           t_respuesta = ult_listo - process_datos.getCreated_at().getTime();
           break;
         }
-        case BLOQUEADO_LISTO: {
+        case "BLOQUEADO_LISTO": {
           ult_listo = dato.getTime().getTime();
           t_bloqueado_total += (ult_listo - ult_bloqueado);
           break;
         }
-        case LISTO_EJECUTANDO: {
+        case "LISTO_EJECUTANDO": {
           ult_ejecutando = dato.getTime().getTime();
           t_espera_total += (ult_ejecutando - ult_listo);
           if (swiche) {
@@ -75,7 +76,7 @@ class Main {
           }
           break;
         }
-        case EJECUTANDO_TERMINADO: {
+        case "EJECUTANDO_TERMINADO": {
           t_ejecucion_total += (dato.getTime().getTime() - ult_ejecutando);
           if (swiche) {
             t_respuesta += t_ejecucion_total;
@@ -83,12 +84,12 @@ class Main {
           }
           break;
         }
-        case EJECUTANDO_LISTO: {
+        case "EJECUTANDO_LISTO": {
           ult_listo = dato.getTime().getTime();
           t_ejecucion_total += (ult_listo - ult_ejecutando);
           break;
         }
-        case EJECUTANDO_BLOQUEADO: {
+        case "EJECUTANDO_BLOQUEADO": {
           ult_bloqueado = dato.getTime().getTime();
           t_ejecucion_total += (ult_bloqueado - ult_ejecutando);
           if (swiche) {
@@ -113,5 +114,10 @@ class Main {
     System.out.println("Promedio de tiempo bloqueado: " + t_bloqueado_prom + "\n");
     System.out.println("Tiempo total: " + tiempo + "\n");
     return t_espera_prom;
+  }
+
+  @Override
+  public String toString() {
+    return "Main []";
   }
 }
